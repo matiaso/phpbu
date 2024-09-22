@@ -64,7 +64,9 @@ abstract class Abstraction
      */
     public function getCommandLine() : CommandLine
     {
-        return $this->createCommandLine();
+        $process = $this->createCommandLine();
+        $process->pipeFail(true);
+        return $process;
     }
 
     /**
