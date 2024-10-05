@@ -167,12 +167,18 @@ class Factory
      */
     public function createTarget(Configuration\Backup\Target $conf): Target
     {
-        $target = new Target($conf->dirname, $conf->filename, $conf->maxRetries, $conf->retryDelay);
+        $target = new Target($conf->dirname, $conf->filename);
         $target->setupPath();
         // add possible compressor
         if (!empty($conf->compression)) {
             $compression = Target\Compression\Factory::create($conf->compression);
             $target->setCompression($compression);
+        }
+        if (!empty($conf->maxRetries)) {
+            $target->setMaxRetries($conf->maxRetries);
+        }
+        if (!empty($conf->retryDelay)) {
+            $target->setRetryDelay($conf->retryDelay);
         }
 
         return $target;

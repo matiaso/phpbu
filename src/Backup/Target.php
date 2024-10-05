@@ -1,4 +1,5 @@
 <?php
+
 namespace phpbu\App\Backup;
 
 use phpbu\App\Backup\File\Local;
@@ -103,9 +104,9 @@ class Target
     /**
      * Constructor.
      *
-     * @param  string  $path
-     * @param  string  $filename
-     * @param  integer $time
+     * @param string $path
+     * @param string $filename
+     * @param integer $time
      */
     public function __construct($path, $filename, $time = null, $maxRetries = null, $retryDelay = null)
     {
@@ -123,7 +124,7 @@ class Target
      * Filename setter.
      *
      * @param string $file
-     * @param int    $time
+     * @param int $time
      */
     public function setFile($file, $time = null)
     {
@@ -196,7 +197,7 @@ class Target
      *
      * @return Path
      */
-    public function getPath() : Path
+    public function getPath(): Path
     {
         return $this->path;
     }
@@ -204,10 +205,10 @@ class Target
     /**
      * Return the name to the backup file.
      *
-     * @param  bool $plain
+     * @param bool $plain
      * @return string
      */
-    public function getFilename(bool $plain = false) : string
+    public function getFilename(bool $plain = false): string
     {
         return $this->filename . $this->getFilenameSuffix($plain);
     }
@@ -217,7 +218,7 @@ class Target
      *
      * @return string
      */
-    public function getFilenamePlain() : string
+    public function getFilenamePlain(): string
     {
         return $this->getFilename(true);
     }
@@ -225,10 +226,10 @@ class Target
     /**
      * Return the raw name of the backup file incl. date placeholder.
      *
-     * @param  bool $plain
+     * @param bool $plain
      * @return string
      */
-    public function getFilenameRaw($plain = false) : string
+    public function getFilenameRaw($plain = false): string
     {
         return $this->filenameRaw . $this->getFilenameSuffix($plain);
     }
@@ -236,10 +237,10 @@ class Target
     /**
      * Return custom file suffix like '.tar'.
      *
-     * @param  bool $plain
+     * @param bool $plain
      * @return string
      */
-    public function getFilenameSuffix($plain = false) : string
+    public function getFilenameSuffix($plain = false): string
     {
         return $this->getSuffixToAppend() . ($plain ? '' : $this->getCompressionSuffix() . $this->getCrypterSuffix());
     }
@@ -249,7 +250,7 @@ class Target
      *
      * @return string
      */
-    public function getSuffixToAppend() : string
+    public function getSuffixToAppend(): string
     {
         return count($this->fileSuffixes) ? '.' . implode('.', $this->fileSuffixes) : '';
     }
@@ -259,7 +260,7 @@ class Target
      *
      * @return string
      */
-    public function getCompressionSuffix() : string
+    public function getCompressionSuffix(): string
     {
         return $this->shouldBeCompressed() ? '.' . $this->compression->getSuffix() : '';
     }
@@ -269,7 +270,7 @@ class Target
      *
      * @return string
      */
-    public function getCrypterSuffix() : string
+    public function getCrypterSuffix(): string
     {
         return $this->shouldBeEncrypted() ? '.' . $this->crypter->getSuffix() : '';
     }
@@ -279,12 +280,13 @@ class Target
      *
      * @return string
      */
-    public function getMimeType() : string
+    public function getMimeType(): string
     {
         $mimeType = $this->mimeType;
         if ($this->shouldBeCompressed()) {
             $mimeType = $this->compression->getMimeType();
         }
+
         return $mimeType;
     }
 
@@ -304,7 +306,7 @@ class Target
      * @return int
      * @throws \phpbu\App\Exception
      */
-    public function getSize() : int
+    public function getSize(): int
     {
         if (null === $this->size) {
             if (!file_exists($this)) {
@@ -312,16 +314,17 @@ class Target
             }
             $this->size = filesize($this);
         }
+
         return $this->size;
     }
 
     /**
      * Target file exists already.
      *
-     * @param  bool $plain
+     * @param bool $plain
      * @return bool
      */
-    public function fileExists(bool $plain = false) : bool
+    public function fileExists(bool $plain = false): bool
     {
         return file_exists($this->getPathname($plain));
     }
@@ -331,7 +334,7 @@ class Target
      *
      * @return \phpbu\App\Backup\File\Local
      */
-    public function toFile() : Local
+    public function toFile(): Local
     {
         return new Local(new SplFileInfo($this->getPathname()));
     }
@@ -339,10 +342,10 @@ class Target
     /**
      * Return path and filename of the backup file.
      *
-     * @param  bool $plain
+     * @param bool $plain
      * @return string
      */
-    public function getPathname(bool $plain = false) : string
+    public function getPathname(bool $plain = false): string
     {
         return $this->path->getPath() . DIRECTORY_SEPARATOR . $this->getFilename($plain);
     }
@@ -352,7 +355,7 @@ class Target
      *
      * @return string
      */
-    public function getPathnamePlain() : string
+    public function getPathnamePlain(): string
     {
         return $this->getPathname(true);
     }
@@ -362,7 +365,7 @@ class Target
      *
      * @return bool
      */
-    public function hasChangingFilename() : bool
+    public function hasChangingFilename(): bool
     {
         return $this->filenameIsChanging;
     }
@@ -404,7 +407,7 @@ class Target
      *
      * @return \phpbu\App\Backup\Target\Compression
      */
-    public function getCompression() : Target\Compression
+    public function getCompression(): Target\Compression
     {
         return $this->compression;
     }
@@ -414,7 +417,7 @@ class Target
      *
      * @return bool
      */
-    public function shouldBeCompressed() : bool
+    public function shouldBeCompressed(): bool
     {
         return $this->compress !== false;
     }
@@ -435,7 +438,7 @@ class Target
      *
      * @return \phpbu\App\Backup\Crypter
      */
-    public function getCrypter() : Crypter
+    public function getCrypter(): Crypter
     {
         return $this->crypter;
     }
@@ -453,17 +456,47 @@ class Target
      *
      * @return bool
      */
-    public function shouldBeEncrypted() : bool
+    public function shouldBeEncrypted(): bool
     {
         return $this->crypt !== false;
     }
 
+    /**
+     * Set Max number of retry in case of failure
+     *
+     * @param int $maxRetries
+     * @return void
+     */
+    public function setMaxRetries(int $maxRetries): void
+    {
+        $this->maxRetries = $maxRetries;
+    }
+
+    /**
+     *  Set Max number of retry in case of failure
+     * @return int|mixed
+     */
     public function getMaxRetries()
     {
         return $this->maxRetries;
     }
 
-    public function getRetryDelay()
+    /**
+     * Set the delay in seconds in between each retry
+     *
+     * @param int $retryDelay
+     * @return void
+     */
+    public function setRetryDelay(int $retryDelay): void
+    {
+        $this->retryDelay = $retryDelay;
+    }
+
+    /**
+     * Get the delay in seconds in between each retry
+     * @return int|mixed
+     */
+    public function getRetryDelay(): int
     {
         return $this->retryDelay;
     }
@@ -473,7 +506,7 @@ class Target
      *
      * @return string
      */
-    public function __toString() : string
+    public function __toString(): string
     {
         return $this->getPathname();
     }
