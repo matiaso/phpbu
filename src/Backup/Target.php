@@ -96,6 +96,10 @@ class Target
      */
     private $crypter;
 
+    private int $maxRetries;
+
+    private int $retryDelay;
+
     /**
      * Constructor.
      *
@@ -103,9 +107,15 @@ class Target
      * @param  string  $filename
      * @param  integer $time
      */
-    public function __construct($path, $filename, $time = null)
+    public function __construct($path, $filename, $time = null, $maxRetries = null, $retryDelay = null)
     {
         $this->path = new Path($path, $time);
+        if (!empty($maxRetries)) {
+            $this->maxRetries = $maxRetries;
+        }
+        if (!empty($retryDelay)) {
+            $this->retryDelay = $retryDelay;
+        }
         $this->setFile($filename, $time);
     }
 
@@ -446,6 +456,16 @@ class Target
     public function shouldBeEncrypted() : bool
     {
         return $this->crypt !== false;
+    }
+
+    public function getMaxRetries()
+    {
+        return $this->maxRetries;
+    }
+
+    public function getRetryDelay()
+    {
+        return $this->retryDelay;
     }
 
     /**

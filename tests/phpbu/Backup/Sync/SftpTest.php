@@ -45,7 +45,7 @@ class SftpTest extends TestCase
     {
         $target = $this->createTargetMock('foo.txt', 'foo.txt.gz');
         $result = $this->createMock(Result::class);
-        $result->expects($this->exactly(6))->method('debug');
+        $result->expects($this->exactly(5))->method('debug');
 
         $clientMock = $this->createMock(\phpseclib\Net\SFTP::class);
         $clientMock->expects($this->once())->method('realpath')->willReturn('/backup');
@@ -69,6 +69,33 @@ class SftpTest extends TestCase
         $sftp->sync($target, $result);
     }
 
+    public function testSyncFailWithRetry()
+    {
+        $this->expectException('phpbu\App\Exception');
+        $target = $this->createTargetMock('foo.txt', 'foo.txt.gz', );
+        $result = $this->createMock(Result::class);
+        $result->expects($this->exactly(8))->method('debug');
+
+        $clientMock = $this->createMock(\phpseclib\Net\SFTP::class);
+        $clientMock->expects($this->exactly(2))->method('is_dir')->will($this->onConsecutiveCalls(true, true));
+        $clientMock->expects($this->exactly(2))->method('chdir');
+        $clientMock->expects($this->exactly(3))
+        ->method('put')
+            ->will($this->onConsecutiveCalls(false, false, false));
+
+        $sftp = $this->createPartialMock(Sftp::class, ['createClient']);
+        $sftp->method('createClient')->willReturn($clientMock);
+
+        $sftp->setup([
+            'host'     => 'example.com',
+            'user'     => 'user.name',
+            'password' => 'secret',
+            'path'     => '/foo'
+        ]);
+
+        $sftp->sync($target, $result);
+    }
+
     /**
      * Tests Sftp::sync
      */
@@ -76,7 +103,7 @@ class SftpTest extends TestCase
     {
         $target = $this->createTargetMock('foo.txt', 'foo.txt.gz');
         $result = $this->createMock(Result::class);
-        $result->expects($this->exactly(5))->method('debug');
+        $result->expects($this->exactly(3))->method('debug');
 
         $clientMock = $this->createMock(\phpseclib\Net\SFTP::class);
         $clientMock->expects($this->exactly(2))->method('is_dir')->will($this->onConsecutiveCalls(true, true));
@@ -247,16 +274,27 @@ class SftpTest extends TestCase
      *
      * @return \phpseclib\Net\SFTP
      */
-    private function createPHPSecLibSftpMock()
+    private function createPHPSecLibSftpMock(): \phpseclib\Net\SFTP
     {
-        $secLib = $this->createMock(phpseclib\Net\SFTP::class);
+        $secLib = $this->createMock(\phpseclib\Net\SFTP::class);
 
-        $secLib->expects($this->exactly(2))
-               ->method('is_dir')
-               ->withConsecutive(['/'], ['foo'])
-               ->will($this->onConsecutiveCalls(true, false));
+        // Mock 'is_dir' method for consecutive calls using a callback
+        $secLib->method('is_dir')
+            ->willReturnCallback(function ($dir) {
+                static $callCount = 0;
+                $callCount++;
+                return $callCount === 1 ? true : false;
+            });
+
         $secLib->method('chdir')->willReturn(true);
-        $secLib->expects($this->once())->method('mkdir')->with('foo')->willReturn(true);
+
+        // Use expects and once for mkdir
+        $secLib->expects($this->once())
+            ->method('mkdir')
+            ->with('foo')
+            ->willReturn(true);
+
+        // Define behavior for put method
         $secLib->method('put')->willReturn(true);
 
         return $secLib;

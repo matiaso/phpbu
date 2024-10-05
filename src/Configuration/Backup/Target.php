@@ -37,15 +37,21 @@ class Target
      */
     public $compression;
 
+    public string $maxRetries;
+
+    public string $retryDelay;
+
     /**
      * Constructor.
      *
-     * @param  string $dir
-     * @param  string $file
-     * @param  string $compression
-     * @throws \phpbu\App\Exception
+     * @param string $dir
+     * @param string $file
+     * @param null $compression
+     * @param null $maxRetries
+     * @param null $retryDelay
+     * @throws Exception
      */
-    public function __construct($dir, $file, $compression = null)
+    public function __construct(string $dir, string $file, $compression = null, $maxRetries = null, $retryDelay = null)
     {
         // check dirname and filename
         if ($dir == '' || $file == '') {
@@ -56,6 +62,14 @@ class Target
 
         if (!empty($compression)) {
             $this->compression = $compression;
+        }
+
+        if (!empty($maxRetries)) {
+            $this->maxRetries = $maxRetries;
+        }
+
+        if (!empty($retryDelay)) {
+            $this->retryDelay = $retryDelay;
         }
     }
 }

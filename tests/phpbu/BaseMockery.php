@@ -23,7 +23,7 @@ trait BaseMockery
      * @param  string $fileCompressed
      * @return \phpbu\App\Backup\Target
      */
-    protected function createTargetMock(string $file = '', string $fileCompressed = '')
+    protected function createTargetMock(string $file = '', string $fileCompressed = '', $maxRetries = null, $retryDelay = null)
     {
         if (strstr($fileCompressed, '.zip')) {
             $compressCmd    = 'zip';
@@ -37,6 +37,8 @@ trait BaseMockery
         $path     = $this->createMock(\phpbu\App\Backup\Path::class);
         $path->method('getPath')->willreturn(dirname($pathName));
         $target   = $this->createMock(\phpbu\App\Backup\Target::class);
+        $target->method('getMaxRetries')->willReturn($maxRetries);
+        $target->method('getRetryDelay')->willReturn($retryDelay);
         $target->method('getSize')->willReturn(1000000000);
         $target->method('getFilename')->willReturn(basename($pathName));
         $target->method('getPathnamePlain')->willReturn($file);
