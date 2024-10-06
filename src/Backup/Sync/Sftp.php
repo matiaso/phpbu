@@ -119,8 +119,8 @@ class Sftp extends Xtp
         $sftp           = $this->createClient();
         $remoteFilename = $target->getFilename();
         $localFile      = $target->getPathname();
-        $maxRetries      = $target->getMaxRetries() ?? 2;
-        $retryDelay      = $target->getRetryDelay() ?? 5;
+        $maxRetries      = $target->getMaxRetries();
+        $retryDelay      = $target->getRetryDelay();
 
         $this->validateRemotePath();
 

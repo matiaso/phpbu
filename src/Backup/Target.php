@@ -111,12 +111,8 @@ class Target
     public function __construct($path, $filename, $time = null, $maxRetries = null, $retryDelay = null)
     {
         $this->path = new Path($path, $time);
-        if (!empty($maxRetries)) {
-            $this->maxRetries = $maxRetries;
-        }
-        if (!empty($retryDelay)) {
-            $this->retryDelay = $retryDelay;
-        }
+        $this->maxRetries = $maxRetries ?? 3;
+        $this->retryDelay = $retryDelay ?? 2;
         $this->setFile($filename, $time);
     }
 
