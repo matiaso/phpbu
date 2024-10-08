@@ -145,42 +145,46 @@ class Sftp extends Xtp
         $result->debug(sprintf('store file \'%s\' as \'%s\' from position %d', $localFile, $remoteFilename, $remoteFileSize));
         $result->debug(sprintf('last error \'%s\'', $sftp->getLastSFTPError()));
 
-        while ($attempt < $maxRetries) {
-            $sftp = $this->createClient();
-            $remoteFilename = $target->getFilename();
-            $localFile = $target->getPathname();
+        $handle = fopen($localFile, 'rb');
+        if ($handle === false) {
+            throw new Exception(sprintf('Error opening local file: %s', $localFile));
+        }
 
-            $this->validateRemotePath();
+        // Move to the correct position in the local file to resume upload
+        fseek($handle, $remoteFileSize);
 
-            foreach ($this->getRemoteDirectoryList() as $dir) {
-                if (!$sftp->is_dir($dir)) {
-                    $result->debug(sprintf('creating remote dir \'%s\'', $dir));
-                    $sftp->mkdir($dir);
-                }
-                $result->debug(sprintf('change to remote dir \'%s\'', $dir));
-                $sftp->chdir($dir);
+        $success = true;
+        while (!feof($handle)) {
+            $data = fread($handle, 4096);
+            if ($data === false) {
+                $success = false;
+                break;
             }
 
-            $result->debug(sprintf('store file \'%s\' as \'%s\'', $localFile, $remoteFilename));
-            $result->debug(sprintf('last error \'%s\'', $sftp->getLastSFTPError()));
+            // Write to the remote file starting from the correct position
+            if (!$sftp->put($remoteFilename, $data, phpseclib\Net\SFTP::SOURCE_STRING, $remoteFileSize)) {
+                $success = false;
+                break;
+            }
+            $remoteFileSize += strlen($data);
+        }
 
-            if ($sftp->put($remoteFilename, $localFile, phpseclib\Net\SFTP::SOURCE_LOCAL_FILE)) {
-                // Successfully uploaded the file
-                $this->cleanup($target, $result);
-                return;
+        fclose($handle);
+
+        if ($success) {
+            // Successfully uploaded the file
+            $this->cleanup($target, $result);
+            return;
+        } else {
+            $attempt++;
+            $result->debug(sprintf('Error uploading file: %s - %s', $localFile, $sftp->getLastSFTPError()));
+
+            if ($attempt < $maxRetries) {
+                $result->debug(sprintf('Retrying upload... attempt %d of %d', $attempt + 1, $maxRetries));
+                sleep($retryDelay);
             } else {
-                $attempt++;
-                $result->debug(sprintf('error uploading file: %s - %s', $localFile, $sftp->getLastSFTPError()));
-
-                if ($attempt < $maxRetries) {
-                    $result->debug(sprintf('retrying upload... attempt %d of %d', $attempt + 1, $maxRetries));
-                    sleep($retryDelay);
-                } else {
-                    throw new Exception(sprintf('error uploading file after %d attempts: %s - %s', $maxRetries, $localFile, $sftp->getLastSFTPError()));
-                }
+                throw new Exception(sprintf('Error uploading file after %d attempts: %s - %s', $maxRetries, $localFile, $sftp->getLastSFTPError()));
             }
-
-            $sftp->disconnect();
         }
 
         $this->cleanup($target, $result);
