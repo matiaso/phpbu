@@ -119,8 +119,8 @@ class Sftp extends Xtp
         $sftp           = $this->createClient();
         $remoteFilename = $target->getFilename();
         $localFile      = $target->getPathname();
-        $maxRetries      = $target->getMaxRetries();
-        $retryDelay      = $target->getRetryDelay();
+        $maxRetries     = $target->getMaxRetries();
+        $retryDelay     = $target->getRetryDelay();
 
         $this->validateRemotePath();
 
@@ -145,34 +145,9 @@ class Sftp extends Xtp
         $result->debug(sprintf('store file \'%s\' as \'%s\' from position %d', $localFile, $remoteFilename, $remoteFileSize));
         $result->debug(sprintf('last error \'%s\'', $sftp->getLastSFTPError()));
 
-        $handle = fopen($localFile, 'rb');
-        if ($handle === false) {
-            throw new Exception(sprintf('Error opening local file: %s', $localFile));
-        }
-
-        // Move to the correct position in the local file to resume upload
-        fseek($handle, $remoteFileSize);
-
-        $success = true;
-        while (!feof($handle)) {
-            $data = fread($handle, 4096);
-            if ($data === false) {
-                $success = false;
-                break;
-            }
-
-            // Write to the remote file starting from the correct position
-            if (!$sftp->put($remoteFilename, $data, phpseclib\Net\SFTP::SOURCE_STRING, $remoteFileSize)) {
-                $success = false;
-                break;
-            }
-            $remoteFileSize += strlen($data);
-        }
-
-        fclose($handle);
+        $success = $sftp->put($remoteFilename, $localFile, phpseclib\Net\SFTP::RESUME);
 
         if ($success) {
-            // Successfully uploaded the file
             $this->cleanup($target, $result);
             return;
         } else {
@@ -189,6 +164,7 @@ class Sftp extends Xtp
 
         $this->cleanup($target, $result);
     }
+
 
     /**
      * Create a sftp handle.
