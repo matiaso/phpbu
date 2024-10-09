@@ -1,4 +1,5 @@
 <?php
+
 namespace phpbu\App\Backup\Sync;
 
 use phpbu\App\Backup\Collector;
@@ -54,16 +55,16 @@ class Sftp extends Xtp
     /**
      * (non-PHPDoc)
      *
-     * @see    \phpbu\App\Backup\Sync::setup()
-     * @param  array $config
+     * @param array $config
      * @throws \phpbu\App\Backup\Sync\Exception
      * @throws \phpbu\App\Exception
+     * @see    \phpbu\App\Backup\Sync::setup()
      */
     public function setup(array $config)
     {
         // make sure either password or private key is configured
         if (!Util\Arr::isSetAndNotEmptyString($config, 'password')
-         && !Util\Arr::isSetAndNotEmptyString($config, 'key')) {
+            && !Util\Arr::isSetAndNotEmptyString($config, 'key')) {
             throw new Exception('\'password\' or \'key\' must be presented');
         }
         parent::setup($config);
@@ -109,62 +110,75 @@ class Sftp extends Xtp
     /**
      * (non-PHPDoc)
      *
-     * @see    \phpbu\App\Backup\Sync::sync()
-     * @param  \phpbu\App\Backup\Target $target
-     * @param  \phpbu\App\Result        $result
+     * @param Target $target * @param  \phpbu\App\Result        $result
      * @throws \phpbu\App\Backup\Sync\Exception
+     * @see    \phpbu\App\Backup\Sync::sync()
      */
     public function sync(Target $target, Result $result)
     {
-        $sftp           = $this->createClient();
         $remoteFilename = $target->getFilename();
         $localFile      = $target->getPathname();
         $maxRetries     = $target->getMaxRetries();
         $retryDelay     = $target->getRetryDelay();
 
-        $this->validateRemotePath();
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $sftp = $this->createClient();
+                $this->validateRemotePath();
 
-        foreach ($this->getRemoteDirectoryList() as $dir) {
-            if (!$sftp->is_dir($dir)) {
-                $result->debug(sprintf('creating remote dir \'%s\'', $dir));
-                $sftp->mkdir($dir);
+                foreach ($this->getRemoteDirectoryList() as $dir) {
+                    if (!$sftp->is_dir($dir)) {
+                        $result->debug(sprintf('creating remote dir \'%s\'', $dir));
+                        $sftp->mkdir($dir);
+                    }
+                    $result->debug(sprintf('change to remote dir \'%s\'', $dir));
+                    $sftp->chdir($dir);
+                }
+
+                $result->debug(sprintf('Preparing to upload file \'%s\' as \'%s\'', $localFile, $remoteFilename));
+
+                // Use the RESUME flag to enable resuming
+                $uploadResult = $sftp->put(
+                    $remoteFilename,
+                    $localFile,
+                    phpseclib\Net\SFTP::SOURCE_LOCAL_FILE | phpseclib\Net\SFTP::RESUME,
+                    -1,
+                    -1,
+                    function ($sent) use ($result, $localFile) {
+                        $totalSize  = filesize($localFile);
+                        $percentage = round(($sent / $totalSize) * 100, 2);
+                        $result->debug(sprintf('Uploaded %d of %d bytes (%.2f%%)', $sent, $totalSize, $percentage));
+                    }
+                );
+
+                if (!$uploadResult) {
+                    throw new Exception(
+                        sprintf('Error uploading file: %s - %s', $localFile, $sftp->getLastSFTPError())
+                    );
+                }
+
+                $result->debug(sprintf('File uploaded successfully on attempt %d', $attempt));
+
+                // run remote cleanup
+                $this->cleanup($target, $result);
+
+                // Exit the retry loop if successful
+                return;
+            } catch (Exception $e) {
+                $result->debug(sprintf('Upload failed on attempt %d: %s', $attempt, $e->getMessage()));
+
+                if ($attempt < $maxRetries) {
+                    $result->debug(sprintf('Retrying in %d seconds...', $retryDelay));
+                    sleep($retryDelay);
+                } else {
+                    // If we've exhausted all retries, rethrow the exception
+                    throw new Exception(
+                        sprintf('Failed to upload after %d attempts: %s', $maxRetries, $e->getMessage())
+                    );
+                }
             }
-            $result->debug(sprintf('change to remote dir \'%s\'', $dir));
-            $sftp->chdir($dir);
         }
-
-        $attempt = 0;
-        $remoteFileSize = $sftp->filesize($remoteFilename) ?: 0;  // Get the size of the remote file (if exists)
-        $localFileSize = filesize($localFile);
-
-        if ($remoteFileSize >= $localFileSize) {
-            $result->debug(sprintf('file already fully uploaded: %s', $remoteFilename));
-            return;
-        }
-
-        $result->debug(sprintf('store file \'%s\' as \'%s\' from position %d', $localFile, $remoteFilename, $remoteFileSize));
-        $result->debug(sprintf('last error \'%s\'', $sftp->getLastSFTPError()));
-
-        $success = $sftp->put($remoteFilename, $localFile, phpseclib\Net\SFTP::RESUME);
-
-        if ($success) {
-            $this->cleanup($target, $result);
-            return;
-        } else {
-            $attempt++;
-            $result->debug(sprintf('Error uploading file: %s - %s', $localFile, $sftp->getLastSFTPError()));
-
-            if ($attempt < $maxRetries) {
-                $result->debug(sprintf('Retrying upload... attempt %d of %d', $attempt + 1, $maxRetries));
-                sleep($retryDelay);
-            } else {
-                throw new Exception(sprintf('Error uploading file after %d attempts: %s - %s', $maxRetries, $localFile, $sftp->getLastSFTPError()));
-            }
-        }
-
-        $this->cleanup($target, $result);
     }
-
 
     /**
      * Create a sftp handle.
@@ -172,13 +186,13 @@ class Sftp extends Xtp
      * @return \phpseclib\Net\SFTP
      * @throws \phpbu\App\Backup\Sync\Exception
      */
-    protected function createClient() : phpseclib\Net\SFTP
+    protected function createClient(): phpseclib\Net\SFTP
     {
         if (!$this->sftp) {
             // silence phpseclib errors
-            $old  = error_reporting(0);
+            $old        = error_reporting(0);
             $this->sftp = new phpseclib\Net\SFTP($this->host, $this->port);
-            $auth = $this->getAuth();
+            $auth       = $this->getAuth();
 
             if (!$this->sftp->login($this->user, $auth)) {
                 error_reporting($old);
@@ -227,6 +241,7 @@ class Sftp extends Xtp
                 $auth->setPassword($this->password);
             }
         }
+
         return $auth;
     }
 
@@ -235,7 +250,7 @@ class Sftp extends Xtp
      *
      * @return array
      */
-    private function getRemoteDirectoryList() : array
+    private function getRemoteDirectoryList(): array
     {
         return Util\Path::getDirectoryListFromAbsolutePath($this->remotePath->getPath());
     }
@@ -243,7 +258,7 @@ class Sftp extends Xtp
     /**
      * Creates collector for SFTP
      *
-     * @param  \phpbu\App\Backup\Target $target
+     * @param \phpbu\App\Backup\Target $target
      * @return \phpbu\App\Backup\Collector
      * @throws \phpbu\App\Backup\Sync\Exception
      */
